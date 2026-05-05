@@ -38,358 +38,88 @@ This platform provides the **Release Intelligence Plane**. It implements a compl
 
 ---
 
-## 📐 Architecture Storytelling: 50+ Advanced Diagrams
+## 📐 High-Level Reference Architecture
 
-### 1. The Release-as-Code Loop
-*The flow from code commit to reliable global availability.*
+### Enterprise Zero Downtime Deployment Platform
+
+**Business Purpose:**  
+Provides a highly resilient, automated release engineering foundation utilizing Blue/Green and Canary deployments on Azure Kubernetes Service (AKS). It ensures zero-downtime application updates and automated rollback capabilities driven by real-time observability and GitOps principles, allowing the enterprise to accelerate release velocity without compromising reliability.
+
 ```mermaid
 graph TD
-    subgraph "Phase 1: Preparation"
-        Build[Build Image]
-        Scan[Sec Scan]
-        Ready[Artifact Ready]
+    subgraph "DevOps & IaC"
+        GitHub[GitHub Actions / CI Pipelines]
+        Terraform[Terraform / IaC Provisioning]
+        Flux[ArgoCD / GitOps Controller]
+        GitHub --> Terraform
+        GitHub --> Flux
     end
 
-    subgraph "Phase 2: Strategy"
-        Choice[Strategy Select]
-        Provision[Env Provision]
-        Deploy[Deploy New Ver]
+    subgraph "Identity & Access"
+        EntraID[Microsoft Entra ID]
+        RBAC[Azure RBAC & Managed Identities]
+        EntraID --> RBAC
     end
 
-    subgraph "Phase 3: Traffic"
-        Shift[Shift 5%]
-        Monitor[Health Check]
-        Promote[Promote 100%]
+    subgraph "Edge & Networking"
+        FrontDoor[Azure Front Door / Global WAF]
+        AppGW[Azure App Gateway / Ingress]
+        FrontDoor --> AppGW
     end
 
-    subgraph "Phase 4: Operations"
-        Audit[Audit Log]
-        SRE[Reliability KPI]
-        Dash[Ops Dashboard]
+    subgraph "Compute & Platform (AKS)"
+        Istio[Istio Service Mesh / Traffic Router]
+        AppBlue[Blue Workload / Stable]
+        AppGreen[Green Workload / Canary]
+        AppGW --> Istio
+        Istio -->|90% Traffic| AppBlue
+        Istio -->|10% Traffic| AppGreen
     end
 
-    Build -->|1. Build| Scan
-    Scan -->|2. Verify| Ready
-    Ready -->|3. Trigger| Choice
-    Choice -->|4. Setup| Provision
-    Provision -->|5. Launch| Deploy
-    Deploy -->|6. Start| Shift
-    Shift -->|7. Gate| Monitor
-    Monitor -->|8. Scale| Promote
-    Promote -->|9. Finalize| Audit
-    Audit -->|10. Visualize| Dash
+    subgraph "Data Layer"
+        Redis[Azure Cache for Redis]
+        CosmosDB[Azure Cosmos DB]
+        AppBlue --> Redis
+        AppGreen --> Redis
+        AppBlue --> CosmosDB
+        AppGreen --> CosmosDB
+    end
+
+    subgraph "Security"
+        KeyVault[Azure Key Vault]
+        Defender[Microsoft Defender for Cloud]
+    end
+
+    subgraph "Observability"
+        Monitor[Azure Monitor / App Insights]
+        Prometheus[Managed Prometheus & Grafana]
+        AppBlue -.-> Monitor
+        AppGreen -.-> Monitor
+        Monitor -.-> Prometheus
+        Prometheus -.->|Trigger Auto-Rollback| Flux
+    end
+
+    RBAC -.-> AppBlue
+    RBAC -.-> KeyVault
+    Terraform -.-> FrontDoor
+    Terraform -.-> AppGW
+    Terraform -.-> CosmosDB
 ```
 
-### 2. Blue/Green Deployment Topology
-```mermaid
-graph LR
-    LB[Load Balancer] --> Blue[Current V1 - Blue]
-    LB -.-> Green[Target V2 - Green]
-    Check{Health Pass?} -->|Yes| Switch[Route Green]
-    Switch --> BlueIDLE[Idle Blue]
-```
+**Key Components:**
+- **Azure Front Door & App Gateway:** Manages global ingress, edge caching, WAF, and SSL offloading before routing traffic to the cluster.
+- **Istio Service Mesh:** Orchestrates intelligent traffic routing (e.g., shifting 10% to Green, 90% to Blue) and enforces mutual TLS between microservices.
+- **Azure Kubernetes Service (AKS):** The core compute platform hosting both stable (Blue) and new (Green) application versions.
+- **ArgoCD / GitOps:** Continuously synchronizes deployment manifests from the repository to the cluster, handling progressive rollouts and automated rollbacks based on health metrics.
+- **Azure Monitor & Prometheus:** Collects telemetry, SLIs (latency, error rates), and triggers ArgoCD/Flux to pause or revert deployments if anomalies are detected.
+- **Microsoft Entra ID & Key Vault:** Provides strict identity-based access control and secrets management via Azure Managed Identities, eliminating hard-coded credentials.
 
-### 3. Canary Rollout Flow
-```mermaid
-graph LR
-    Prod[Users] --> LB[Ingress Controller]
-    LB -->|95%| Stable[Stable Version]
-    LB -->|5%| Canary[Canary Version]
-    Canary --> Metrics[Error Rate < 0.1%]
-    Metrics -->|Success| Shift[Increase to 20%]
-```
-
-### 4. Zero Downtime Architecture
-```mermaid
-graph LR
-    UI[React Dashboard] --> API[FastAPI Gateway]
-    API --> Cache[(Redis State Cache)]
-    API --> DB[(Postgres Release DB)]
-    API --> Engine[Deployment Engine]
-```
-
-### 5. Deployment Topology: Multi-Region Release Factory
-```mermaid
-graph LR
-    Region[Cloud Region] --> Factory[Release Factory]
-    Factory --> S1[Strategy Workers]
-    Factory --> S2[Traffic Hubs]
-    Factory --> S3[Health Nodes]
-    S1 --> Storage[(ECR Registry)]
-```
-
-### 6. Automated Rollback Model
-```mermaid
-graph LR
-    Service[Live Service] --> SRE{Error > 2%?}
-    SRE -->|Yes| Trigger[Rollback Engine]
-    Trigger --> Revert[Restore Previous Ver]
-    Revert --> Alert[Notify On-Call]
-```
-
-### 7. Foundation: Multi-Environment Setup
-```mermaid
-graph LR
-    F[Foun] --> M[Mult]
-```
-
-### 8. Networking: Hardened Ingress Topology
-```mermaid
-graph LR
-    N[Netw] --> H[Hard]
-```
-
-### 9. Component: Strategy Engine
-```mermaid
-graph LR
-    C[Comp] --> S[Stra]
-```
-
-### 10. Component: Traffic Hub
-```mermaid
-graph LR
-    C[Comp] --> T[Traf]
-```
-
-### 11. Component: Health Engine
-```mermaid
-graph LR
-    C[Comp] --> H[Heal]
-```
-
-### 12. Component: Rollback Engine
-```mermaid
-graph LR
-    C[Comp] --> R[Roll]
-```
-
-### 13. Logic: Blue/Green Switch
-```mermaid
-graph LR
-    L[Logi] --> Blue[Blue]
-```
-
-### 14. Logic: Canary Weight Shifting
-```mermaid
-graph LR
-    L[Logi] --> Cana[Cana]
-```
-
-### 15. Logic: Shadow Launch Simulation
-```mermaid
-graph LR
-    L[Logi] --> Shad[Shad]
-```
-
-### 16. Logic: Automated Reversion
-```mermaid
-graph LR
-    L[Logi] --> Auto[Auto]
-```
-
-### 17. Architecture: Global Control Plane
-```mermaid
-graph LR
-    A[Arch] --> G[Glob]
-```
-
-### 18. Architecture: Deployment Mesh
-```mermaid
-graph LR
-    A[Arch] --> D[Depl]
-```
-
-### 19. Architecture: Multi-Sink Reporting
-```mermaid
-graph LR
-    A[Arch] --> M[Mult]
-```
-
-### 20. Pattern: Release-as-Code
-```mermaid
-graph LR
-    P[Patt] --> R[Rele]
-```
-
-### 21. Pattern: Immutable Target Zones
-```mermaid
-graph LR
-    P[Patt] --> I[Immu]
-```
-
-### 22. Pattern: Progressive Delivery
-```mermaid
-graph LR
-    P[Patt] --> P[Prog]
-```
-
-### 23. Security: Signed Release Artifacts
-```mermaid
-graph LR
-    S[Secu] --> S[Sign]
-```
-
-### 24. Security: RBAC Approval Flow
-```mermaid
-graph LR
-    S[Secu] --> R[RBAC]
-```
-
-### 25. Security: Secure Audit Record
-```mermaid
-graph LR
-    S[Secu] --> S[Secu]
-```
-
-### 26. Feature: Release Heatmap UI
-```mermaid
-graph LR
-    F[Feat] --> R[Rele]
-```
-
-### 27. Feature: Real-time Velocity Tailing
-```mermaid
-graph LR
-    F[Feat] --> R[Real]
-```
-
-### 28. Feature: Auto-generated PCAPs
-```mermaid
-graph LR
-    F[Feat] --> A[Auto]
-```
-
-### 29. Compliance: NIST Release Audits
-```mermaid
-graph LR
-    C[Comp] --> N[NIST]
-```
-
-### 30. Compliance: Audit Trail Persistence
-```mermaid
-graph LR
-    C[Comp] --> A[Audi]
-```
-
-### 31. Infrastructure: Redis State Cache
-```mermaid
-graph LR
-    I[Infr] --> R[Redi]
-```
-
-### 32. Infrastructure: Postgres Release DB
-```mermaid
-graph LR
-    I[Infr] --> P[Post]
-```
-
-### 33. Deployment: Kubernetes Strategy Pods
-```mermaid
-graph LR
-    D[Depl] --> K[Kube]
-```
-
-### 34. Deployment: Multi-Region Wave Sync
-```mermaid
-graph LR
-    D[Depl] --> M[Mult]
-```
-
-### 35. Monitoring: release velocity KPI
-```mermaid
-graph LR
-    M[Moni] --> R[Rele]
-```
-
-### 36. Monitoring: rollback frequency KPI
-```mermaid
-graph LR
-    M[Moni] --> R[Roll]
-```
-
-### 37. UI: Unified Release Dashboard
-```mermaid
-graph LR
-    U[UI] --> U[Unif]
-```
-
-### 38. UI: Traffic Hub UI
-```mermaid
-graph LR
-    U[UI] --> T[Traf]
-```
-
-### 39. UI: ROI View
-```mermaid
-graph LR
-    U[UI] --> R[ROIV]
-```
-
-### 40. UI: Readiness Heatmap
-```mermaid
-graph LR
-    U[UI] --> R[Read]
-```
-
-### 41. CI/CD: Release validation pipeline
-```mermaid
-graph LR
-    C[CICD] --> R[Rele]
-```
-
-### 42. CI/CD: Deployment engine tests
-```mermaid
-graph LR
-    C[CICD] --> D[Depl]
-```
-
-### 43. Strategy: Reliability-First Release
-```mermaid
-graph LR
-    S[Stra] --> R[Reli]
-```
-
-### 44. Strategy: Data-Driven Rollouts
-```mermaid
-graph LR
-    S[Stra] --> D[Data]
-```
-
-### 45. Feature: Multi-Cloud Search Bridge
-```mermaid
-graph LR
-    F[Feat] --> M[Mult]
-```
-
-### 46. Feature: Real-time Outage Alerts
-```mermaid
-graph LR
-    F[Feat] --> R[Real]
-```
-
-### 47. Feature: UX Forecasting
-```mermaid
-graph LR
-    F[Feat] --> U[UXFo]
-```
-
-### 48. Logic: Cost Comparison Engine
-```mermaid
-graph LR
-    L[Logi] --> C[Cost]
-```
-
-### 49. Data Model: Deployment Task Entity
-```mermaid
-graph LR
-    D[Data] --> D[Depl]
-```
-
-### 50. Enterprise Release Excellence
-```mermaid
-graph LR
-    E[Entr] --> E[Rele]
-```
+**How this maps to IaC:**
+- **`module.network`:** Provisions Azure Virtual Networks, Subnets, Private Endpoints, and the Application Gateway.
+- **`module.compute`:** Bootstraps the AKS cluster, Node Pools, and installs foundational add-ons (Istio, GitOps operators).
+- **`module.data`:** Deploys Cosmos DB and Azure Cache for Redis with network isolation and automated backups.
+- **`module.security`:** Configures Azure Key Vault, sets up RBAC role assignments, and enforces Defender for Cloud compliance policies.
+- **`module.observability`:** Integrates Log Analytics workspaces, Azure Monitor managed service for Prometheus, and Grafana dashboards for SREs.
 
 ---
 
